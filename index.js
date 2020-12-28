@@ -88,7 +88,8 @@ const typeDefs = gql`
   type Author {
     name: String!,
     born: Int,
-    bookCount: Int!
+    bookCount: Int!,
+    id: ID!
   }
   type Book {
     title: String!,
@@ -139,7 +140,8 @@ const resolvers = {
         return {
           name: author.name,
           bookCount: books.filter(book => book.author === author.name).length,
-          born: author.born
+          born: author.born,
+          id: author.id
         }
       })
     }
@@ -214,5 +216,23 @@ query {
 
 
 /* mutation
+mutation {
+  addBook(
+    title: "NoSQL Distilled",
+    author: "Martin Fowler",
+    published: 2012,
+    genres: ["database", "nosql"]
+  ) {
+    title,
+    author
+  }
+}
+
+mutation {
+  editAuthor(name: "Martin Fowler", setBornTo: 1958) {
+    name
+    born
+  }
+}
 
 */
