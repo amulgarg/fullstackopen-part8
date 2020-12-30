@@ -1,5 +1,19 @@
 const { ApolloServer, gql } = require('apollo-server')
 const { v1: uuid } = require('uuid');
+require('dotenv').config();
+const mongoose = require('mongoose');
+const Book = require('./models/book');
+const Author = require('./models/author');
+
+
+mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true, useFindAndModify: false, useCreateIndex: true })
+    .then(() => {
+      console.log('connected to MongoDB')
+    })
+    .catch((error) => {
+      console.log('error connection to MongoDB:', error.message)
+    })
+
 
 let authors = [
   {
@@ -94,7 +108,7 @@ const typeDefs = gql`
   type Book {
     title: String!,
     published: Int,
-    author: String!,
+    author: Author,
     genres: [String!]!,
     id: ID!
   }
@@ -120,14 +134,19 @@ const typeDefs = gql`
 
 const resolvers = {
   Query: {
-    bookCount: () => books.length,
-    authorCount: () => authors.length,
-    allBooks: (root, args) => {
-      let booksList = books;
-      
-      if(args.author){
+    bookCount: async () => {
+      const books = await Book.find({});
+      return books.length;
+    },
+    authorCount: async () => {
+      const books = await Author.find({});
+      return books.length;
+    },
+    allBooks: async (root, args) => {
+      let booksList = await Book.find({});      
+      /* if(args.author){
         booksList = books.filter(book => book.author === args.author)
-      }
+      } */
 
       if(args.genre){
         booksList = booksList.filter(book => book.genres.includes(args.genre))
@@ -135,32 +154,46 @@ const resolvers = {
 
       return booksList;
     },
-    allAuthors: () => {
-      return authors.map(author => {
+    allAuthors: async () => {
+      const authorsList = await Author.find({});
+      return authorsList.map(async (author) => {
+        const booksByAuthor = await Book.find({author: author});
+        console.log('bookslen', booksByAuthor.length);
         return {
+          id: author._id,
           name: author.name,
-          bookCount: books.filter(book => book.author === author.name).length,
-          born: author.born,
-          id: author.id
+          bookCount: booksByAuthor.length,
+          born: author.born
         }
-      })
+      });
     }
   },
   Mutation: {
-    addBook: (root, args) => {
+    addBook: async (root, args) => {
+
+      let author = await Author.findOne({name: args.author});
+      let authorResult = author;
+      console.log('author', author);
       
-      if(!authors.find(author => author.name === args.author)){
-        authors = authors.concat({ name: args.author, id: uuid()})
+      if(!author){
+        author = new Author({name: args.author});
+        authorResult = await author.save();
       }
 
-      const newBook = {...args, id: uuid()};
-      books = books.concat(newBook);
-      return newBook;
-    
+      console.log('authorResult', authorResult);
+
+      const newBook = new Book({
+        title: args.title,
+        published: args.published,
+        genres: args.genres,
+        author: authorResult    
+      });
+      const newBookResult = await newBook.save();
+      return newBook;    
     },
 
-    editAuthor: (root, args) => {
-      const authorToUpdate = authors.find(author => author.name === args.name);
+    editAuthor: async (root, args) => {
+      const authorToUpdate = await Author.findOne({ name: args.name });
 
       console.log('authorToUpdate', authorToUpdate);
       
@@ -168,19 +201,12 @@ const resolvers = {
         return null;
       }
 
-      const updatedAuthor =  { ...authorToUpdate, born: args.setBornTo };
+      authorToUpdate.born = args.setBornTo;
+      const updatedAuthorResult = await authorToUpdate.save();     
 
-      console.log('updatedAuthor', updatedAuthor);
-      
-      authors = authors.map( author => {
-        if(author.name === args.name){
-          console.log('aya idhar')
-          return updatedAuthor;
-        }
-        return author;
-      })
+      console.log('updatedAuthorResult', updatedAuthorResult);
 
-      return updatedAuthor;
+      return updatedAuthorResult;
     }
   }
 }
