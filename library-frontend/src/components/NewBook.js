@@ -21,7 +21,9 @@ const NewBook = (props) => {
     console.log('add book...')
     createBook({ variables: {
       title, author, published: parseInt(published, 10), genres
-    }})
+    }}).catch(error => {
+      props.setError(error.message);
+    })
     setTitle('')
     setPublished('')
     setAuhtor('')
